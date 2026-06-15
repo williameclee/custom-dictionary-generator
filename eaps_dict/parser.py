@@ -31,7 +31,7 @@ def unique_ordered(items: list[str]) -> list[str]:
 def find_entries_with_same_translation(
     df: pd.DataFrame,
     entry_col: str = "Entry",
-    translation_cols: list[str] | str = ["Translation", "TranslationSynonyms"],
+    translation_cols: list[str] | str = ["translation", "translation_synonyms"],
 ) -> dict[str, set[str]]:
     """
     Returns a dictionary the contains the mapping from a translation to its corresponding term(s) in the original language.
@@ -81,6 +81,8 @@ def load_and_clean_csv(
         df["acronyms"] = df["acronyms"].apply(lambda t: clean_split(t))
     if "aliases" in df:
         df["aliases"] = df["aliases"].apply(lambda t: clean_split(t))
+    if "synonyms" in df:
+        df["synonyms"] = df["synonyms"].apply(lambda t: clean_split(t))
     if "see_alsos" in df:
         df["see_alsos"] = df["see_alsos"].apply(lambda t: clean_split(t))
     if "translation" in df:

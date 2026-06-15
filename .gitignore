@@ -9,6 +9,9 @@ build
 Makefile
 *.sh
 
+local_test.py
+
 *.xls
 *.numbers
 *.dictionary
+OtherResources/
