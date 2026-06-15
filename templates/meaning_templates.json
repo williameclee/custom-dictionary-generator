@@ -1,0 +1,13 @@
+{
+  "meaning": "<p>{FIELD}{DESCRIPTION}{NOTES}</p>{ACRONYM}{SYNONYM}{SEE_ALSO}",
+  "field": "<span class=\"field {TRANS_LANG}\">{FIELD}</span>",
+  "description-container": "<span class=\"description-container {TRANS_LANG}\">{DESCRIPTION}</span>",
+  "description": "<span class=\"description {TRANS_LANG}\">{DESCRIPTION}</span>",
+  "notes": "<span class=\"notes {TRANS_LANG}\">{NOTES}</span>",
+  "acronym-container": "\n<p class=\"acronym-container {TRANS_LANG}\">{ACRONYM}</p>",
+  "acronym": "<span class=\"acronym {LANG}\">{ACRONYM}</span>",
+  "synonym-container": "\n<p class=\"synonym-container {TRANS_LANG}\">{SYNONYM}</p>",
+  "synonym": "<span class=\"synonym {LANG}\">{SYNONYM}</span>",
+  "see_also-container": "\n<p class=\"see_also-container {TRANS_LANG}\">{SEE_ALSO}</p>",
+  "see_also": "<span class=\"see_also {LANG\">{SEE_ALSO}</span>"
+}
