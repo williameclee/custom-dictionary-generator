@@ -8,7 +8,9 @@ def clean_split(value: str, delimiter: str = "; ") -> list[str]:
     """Helper to split a string by delimiter, strip whitespace, and filter empty results."""
     if not value:
         return []
-    parts = value.split(delimiter)
+    # Normalise different delimiters to the delimiter (e.g. "; ")
+    normalised = value.replace("；", delimiter).replace("、", delimiter)
+    parts = normalised.split(delimiter)
     cleaned = []
     for p in parts:
         p_strip = p.strip()
@@ -30,17 +32,14 @@ def unique_ordered(items: list[str]) -> list[str]:
 
 def find_entries_with_same_translation(
     df: pd.DataFrame,
-    entry_col: str = "Entry",
-    translation_cols: list[str] | str = ["translation", "translation_synonyms"],
+    entry_col: str = "term",
+    translation_cols: list[str] | str = "translation",
 ) -> dict[str, set[str]]:
     """
-    Returns a dictionary the contains the mapping from a translation to its corresponding term(s) in the original language.
+    Returns a dictionary that contains the mapping from a translation to its corresponding term(s) in the original language.
     """
     if isinstance(translation_cols, str):
         translation_cols = [translation_cols]
-    assert entry_col in df and (
-        all([col in df for col in translation_cols])
-    ), f"Either '{entry_col}' or '{translation_cols}' is not a column of the input DataFrame."
 
     translation_pairs = {}
     for _, row in df.iterrows():
@@ -65,39 +64,51 @@ def find_entries_with_same_translation(
 
 def load_and_clean_csv(
     csv_path: Path | str,
-    sort_alphabetically: bool = False,
+    sort: bool = False,
     gen_synonyms_from_translation: bool = False,
 ) -> pd.DataFrame:
     df = pd.read_csv(csv_path, delimiter="\t", dtype=str)
-
-    # Basic cleaning
     df.columns = df.columns.str.strip()
-    df = df.dropna(subset="term")
-    df = df.fillna("")
+    df = df.dropna(subset=["term"]).fillna("")
     df = df.map(lambda x: x.strip() if isinstance(x, str) else "")
 
-    # Clean up columns
-    if "acronyms" in df:
-        df["acronyms"] = df["acronyms"].apply(lambda t: clean_split(t))
-    if "aliases" in df:
-        df["aliases"] = df["aliases"].apply(lambda t: clean_split(t))
-    if "synonyms" in df:
-        df["synonyms"] = df["synonyms"].apply(lambda t: clean_split(t))
-    if "see_alsos" in df:
-        df["see_alsos"] = df["see_alsos"].apply(lambda t: clean_split(t))
-    if "translation" in df:
-        df["translation"] = df["translation"].apply(lambda t: clean_split(t))
-    if "translation_synonyms" in df:
-        df["translation_synonyms"] = df["translation_synonyms"].apply(
-            lambda t: clean_split(t)
-        )
-        if "translation" in df:
-            for _, row in df.iterrows():
-                row["translation"] += row["translation_synonyms"]
-            df = df.drop(columns=["translation_synonyms"])
+    # Ensure all standard columns are present
+    expected_cols = [
+        "term",
+        "acronyms",
+        "description",
+        "field",
+        "synonyms",
+        "see_alsos",
+        "aliases",
+        "translation",
+        "translation_synonyms",
+        "notes",
+    ]
+    for col in expected_cols:
+        if col not in df.columns:
+            df[col] = ""
+
+    # Clean up fields into lists
+    for col in [
+        "acronyms",
+        "aliases",
+        "synonyms",
+        "see_alsos",
+        "translation",
+        "translation_synonyms",
+    ]:
+        df[col] = df[col].apply(lambda t: clean_split(t))
+
+    # Merge translation synonyms into translation list
+    df["translation"] = df.apply(
+        lambda d: unique_ordered(d["translation"] + d["translation_synonyms"]), axis=1
+    )
+
+    df = df.drop(columns=["translation_synonyms"])
 
     # Sort if requested
-    if sort_alphabetically:
+    if sort:
         sort_cols = []
         if "term" in df.columns:
             sort_cols.append("term")
@@ -110,42 +121,74 @@ def load_and_clean_csv(
             df = df.drop(columns=["translation_aux"])
 
     # Find synonyms if requested
-    if gen_synonyms_from_translation and "translation" in df:
+    if gen_synonyms_from_translation and "translation" in df.columns:
         translation_pairs = find_entries_with_same_translation(
             df, "term", "translation"
         )
 
         def find_synonym(name: str, translations: list[str]) -> list[str]:
-            synonyms = set()
+            syns = set()
             for t in translations:
-                synonyms.update(translation_pairs[t] - {name})
-            return list(synonyms)
+                syns.update(translation_pairs.get(t, set()) - {name})
+            return sorted(list(syns))
 
+        # Update synonym column by combining with any existing synonyms
         df["synonyms"] = df.apply(
-            lambda r: find_synonym(r["term"], r["translation"]), axis=1
+            lambda r: unique_ordered(
+                r["synonyms"] + find_synonym(r["term"], r["translation"])
+            ),
+            axis=1,
         )
 
     return df
 
 
 def parse_dictionary_csv(
-    csv_path: Path | str,
+    csv_paths: list[Path | str] | Path | str,
     is_translation: bool = False,
-    sort_alphabetically: bool = False,
-    gen_synonyms_from_translation: bool = False,
+    sort: bool = False,
+    gen_synonyms: bool = False,
 ) -> list[Term]:
     """
     Unified dictionary parser using pandas.
     Different behaviors are driven by argument flags.
     """
-    df = load_and_clean_csv(
-        csv_path,
-        sort_alphabetically=sort_alphabetically,
-        gen_synonyms_from_translation=gen_synonyms_from_translation,
-    )
+    if isinstance(csv_paths, (str, Path)):
+        csv_paths = [csv_paths]
 
-    # Group entries by the first column ('Entry' for both NWS and NAER)
-    # preserving order of appearance in the (possibly sorted) dataframe.
+    dfs = []
+    for csv_path in csv_paths:
+        csv_path = Path(csv_path)
+        if not csv_path.exists():
+            continue
+        df_file = load_and_clean_csv(
+            csv_path,
+            sort=False,  # Sort after merging
+            gen_synonyms_from_translation=gen_synonyms,
+        )
+        if not df_file.empty:
+            dfs.append(df_file)
+
+    if not dfs:
+        return []
+
+    # Concatenate all DataFrames
+    df = pd.concat(dfs, ignore_index=True)
+
+    # Perform stable sort on merged dataframe if requested
+    if sort:
+        sort_cols = []
+        if "term" in df.columns:
+            sort_cols.append("term")
+        if "translation" in df.columns:
+            df["translation_aux"] = df["translation"].apply(lambda l: "".join(l))
+            sort_cols.append("translation_aux")
+        if sort_cols:
+            df = df.sort_values(by=sort_cols, kind="stable")
+        if "translation_aux" in df:
+            df = df.drop(columns=["translation_aux"])
+
+    # Group entries by the term column preserving order of appearance in the dataframe
     term_dict: dict[str, list[Meaning]] = {}
     alias_dict: dict[str, list[str]] = {}
     names: list[str] = []
@@ -168,25 +211,13 @@ def parse_dictionary_csv(
             alias_dict[name] = []
         alias_dict[name] += aliases
 
-    terms = [Term(name, term_dict[name], alias_dict.get(name, None)) for name in names]
+    # Construct Term objects
+    terms = [
+        Term(
+            name=name,
+            meanings=term_dict[name],
+            aliases=unique_ordered(alias_dict.get(name, [])),
+        )
+        for name in names
+    ]
     return terms
-
-
-def parse_nws_glossary(csv_path: Path | str) -> list[Term]:
-    """Wrapper function to parse NWS glossary for backward compatibility."""
-    return parse_dictionary_csv(
-        csv_path,
-        is_translation=False,
-        sort_alphabetically=False,
-        gen_synonyms_from_translation=False,
-    )
-
-
-def parse_naer_translations(csv_path: Path | str) -> list[Term]:
-    """Wrapper function to parse NAER translations for backward compatibility."""
-    return parse_dictionary_csv(
-        csv_path,
-        is_translation=True,
-        sort_alphabetically=True,
-        gen_synonyms_from_translation=True,
-    )

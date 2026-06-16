@@ -15,3 +15,8 @@ local_test.py
 *.numbers
 *.dictionary
 OtherResources/
+
+outputs/
+assets/
+configs/
+data/

@@ -9,5 +9,5 @@
   "synonym-container": "\n<p class=\"synonym-container {TRANS_LANG}\">{SYNONYM}</p>",
   "synonym": "<span class=\"synonym {LANG}\">{SYNONYM}</span>",
   "see_also-container": "\n<p class=\"see_also-container {TRANS_LANG}\">{SEE_ALSO}</p>",
-  "see_also": "<span class=\"see_also {LANG\">{SEE_ALSO}</span>"
+  "see_also": "<span class=\"see_also {LANG}\">{SEE_ALSO}</span>"
 }

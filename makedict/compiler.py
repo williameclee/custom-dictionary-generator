@@ -9,8 +9,9 @@ logger = logging.getLogger(__name__)
 
 def compile_dictionary(
     dict_name: str,
-    dict_id: Path | str,
-    css_path: Path | str | None = None,
+    xml_path: Path | str,
+    css_path: Path | str,
+    plist_path: Path | str,
     ddk_dir: Path | str = Path("/Applications/Utilities/DictionaryDevelopmentKit"),
     dest_dir: Path | str = Path("~/Library/Dictionaries"),
     create_symlink: bool = False,
@@ -18,12 +19,13 @@ def compile_dictionary(
 ) -> bool:
     """
     Compiles the dictionary using the Apple Dictionary Development Kit (DDK).
-
-    Equivalent to executing makeeapsdict.sh or makeeapstrans.sh.
     """
     ddk_dir = Path(ddk_dir)
     dest_dir = Path(dest_dir)
     cwd = Path(cwd)
+    xml_path = Path(xml_path)
+    css_path = Path(css_path)
+    plist_path = Path(plist_path)
 
     build_dict_sh = ddk_dir / "bin" / "build_dict.sh"
 
@@ -40,19 +42,18 @@ def compile_dictionary(
     objects_dir = cwd / "objects"
     compiled_bundle_path = objects_dir / f"{dict_name}.dictionary"
 
+    # Verify input paths exist
+    assert xml_path.exists(), f"The XML source {xml_path} cannot be found."
+    assert css_path.exists(), f"The style sheet {css_path} cannot be found."
+    assert plist_path.exists(), f"The plist file {plist_path} cannot be found."
+
     # Command arguments for build_dict.sh
-    # $DICT_BUILD_TOOL_BIN/build_dict.sh $DICT_BUILD_OPTS "$DICT_NAME" $DICT_ID.xml $DICT_ID.css $DICT_ID.plist
-    if css_path is None:
-        css_path = Path(f"{dict_id}.css")
-        assert css_path.exists(), f"The style sheet {css_path} cannot be found."
-    elif isinstance(css_path, str):
-        css_path = Path(css_path)
     cmd = [
         build_dict_sh.as_posix(),
         dict_name,
-        f"{dict_id}.xml",
+        xml_path.as_posix(),
         css_path.as_posix(),
-        f"{dict_id}.plist",
+        plist_path.as_posix(),
     ]
 
     logger.info(f"Running build command: {' '.join(cmd)}")
