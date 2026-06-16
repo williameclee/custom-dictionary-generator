@@ -1,5 +1,6 @@
 {
-  "term": "<d:entry id=\"{ID}\" d:title=\"{TITLE}\">\n\t{VAL}\n\t<div class=\"container\">\n\t\t<h1>{H1}<span class=\"source\">{SOURCE}</span></h1>\n\t\t<div class=\"body\">{MEANING}</div>\n\t</div>\n</d:entry>",
+  "term": "<d:entry id=\"{ID}\" d:title=\"{TITLE}\">\n\t{VAL}\n\t<div class=\"container\">\n\t\t<h1>{H1}{SOURCE}</h1>\n\t\t<div class=\"body\">{MEANING}</div>\n\t</div>\n</d:entry>",
+  "source": "<span class=\"source\">{SOURCE}</span>",
   "meaning-list": "<ol class=\"meanings\">{MEANING}</ol>",
   "meaning": "<li>{MEANING}</li>",
   "val": "<d:index d:value=\"{VAL}\"/>",

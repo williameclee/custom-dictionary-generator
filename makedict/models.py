@@ -76,13 +76,13 @@ class Meaning:
     @classmethod
     def from_dict(cls, d: dict, is_translation: bool = False):
         if is_translation:
-            descriptions = d["translation"]
-            # more_descriptions = d.get("translation_synonyms", [])
-            # descriptions = itertools.chain.from_iterable(
-            #     [descriptions, more_descriptions]
-            # )
+            descriptions = d.get("translation", [])
         else:
-            descriptions = d["description"]
+            descriptions = d.get("description", [])
+
+        # In case descriptions is still a string in dict (though clean_split makes it list)
+        if isinstance(descriptions, str):
+            descriptions = [descriptions]
 
         return Meaning(
             descriptions=descriptions,
@@ -98,21 +98,23 @@ class Meaning:
         lang: str = "",
         trans_lang: str = "",
     ) -> str:
-
         xml = self.html_templates["meaning"]
 
+        # 1. Field
         if self.field:
             field_txt = self.html_templates["field"].replace(r"{FIELD}", self.field)
             xml = xml.replace(r"{FIELD}", field_txt)
         else:
             xml = xml.replace(r"{FIELD}", "")
 
+        # 2. Notes
         if self.notes:
             notes_txt = self.html_templates["notes"].replace(r"{NOTES}", self.notes)
             xml = xml.replace(r"{NOTES}", notes_txt)
         else:
             xml = xml.replace(r"{NOTES}", "")
 
+        # 3. Description, acronyms, synonyms, see also
         for field, items in [
             ("description", self.descriptions),
             ("acronym", sorted(list(self.acronyms))),
@@ -125,8 +127,8 @@ class Meaning:
                     rep_kw,
                     populate_list_template(
                         items,
-                        self.html_templates[f"{field.lower()}-container"],
-                        self.html_templates[field.lower()],
+                        self.html_templates[f"{field}-container"],
+                        self.html_templates[field],
                         rep_kw,
                     ),
                 )
@@ -164,12 +166,30 @@ class Term:
             self.aliases = []
 
     @property
-    def acronyms(self):
-        return list(itertools.chain.from_iterable([m.acronyms for m in self.meanings]))
+    def acronyms(self) -> list[str]:
+        return sorted(
+            list(
+                set(itertools.chain.from_iterable([m.acronyms for m in self.meanings]))
+            )
+        )
+
+    @property
+    def synonyms(self) -> list[str]:
+        return sorted(
+            list(
+                set(itertools.chain.from_iterable([m.synonyms for m in self.meanings]))
+            )
+        )
 
     def gen_xml(
-        self, lang: str = "", trans_lang: str = "", source_name: str = ""
+        self,
+        lang: str = "",
+        trans_lang: Optional[str] = None,
+        source_name: Optional[str] = None,
     ) -> str:
+        if trans_lang is None:
+            trans_lang = lang
+            
         val = self.xml_template["val"]
         val = val.replace("{VAL}", self.name)
 
@@ -194,12 +214,18 @@ class Term:
         xml = xml.replace("{VAL}", val)
         xml = xml.replace("{ID}", self.name)
         xml = xml.replace("{TITLE}", self.name)
-        xml = xml.replace("{SOURCE}", source_name)
+        if source_name:
+            xml = xml.replace(
+                "{SOURCE}", self.xml_template["source"].replace("{SOURCE}", source_name)
+            )
+        else:
+            xml = xml.replace("{SOURCE}", "")
         xml = xml.replace("{H1}", self.name)
 
         if len(self.meanings) == 1:
             xml = xml.replace(
-                "{MEANING}", self.meanings[0].gen_html(lang=lang, trans_lang=trans_lang)
+                "{MEANING}",
+                self.meanings[0].gen_html(lang=lang, trans_lang=trans_lang),
             )
         else:
             xml = xml.replace(
